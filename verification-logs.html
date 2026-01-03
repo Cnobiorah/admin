@@ -328,7 +328,7 @@
 
   function toCsv(rows) {
     const esc = (v) => '"' + String(v ?? "").replaceAll('"','""') + '"';
-    const header = ["verified_at","booking_ref","customer","package","result","verified_by","notes"];
+    const header = ["verified_at","booking_ref","customer","package","outcome","verified_by","message"];
     const lines = [header.map(esc).join(",")];
     for (const r of rows) {
       lines.push([r.verified_at, r.booking_ref, r.customer_name, r.package_name, r.result, r.verified_by, r.notes].map(esc).join(","));
@@ -356,11 +356,24 @@
 
     let q = supabase
       .from("booking_verifications")
-      .select("booking_ref, verified_at, verified_by, result, status, notes", { count: "exact" })
+      .select(`
+        booking_uuid,
+        booking_code,
+        verified_at,
+        verified_by,
+        outcome,
+        message,
+        booking:bookings (
+          booking_ref,
+          customer_name,
+          package:packages ( name )
+        )
+      `, { count: "exact" })
       .order("verified_at", { ascending: false })
       .limit(200);
 
-    if (ref) q = q.ilike("booking_ref", `%${ref}%`);
+    // Search by booking reference/code
+    if (ref) q = q.ilike("booking_code", `%${ref}%`);
 
     // Staff filter: allow prefix match on uuid text
     if (staff) q = q.ilike("verified_by", `${staff}%`);
@@ -368,15 +381,12 @@
     // Date range (inclusive start, inclusive end by adding 1 day to dateTo)
     if (dateFrom) q = q.gte("verified_at", `${dateFrom}T00:00:00.000Z`);
     if (dateTo) {
-      const endStart = `${dateTo}T00:00:00.000Z`;
-      const next = new Date(Date.parse(endStart) + 24*60*60*1000).toISOString();
+      const next = new Date(Date.parse(`${dateTo}T00:00:00.000Z`) + 24*60*60*1000).toISOString();
       q = q.lt("verified_at", next);
     }
 
-    if (result) {
-      // Try matching either result or status
-      q = q.or(`result.ilike.%${result}%,status.ilike.%${result}%`);
-    }
+    // Outcome filter
+    if (result) q = q.ilike("outcome", `%${result}%`);
 
     return q;
   }
@@ -392,33 +402,17 @@
     if (vErr) throw vErr;
 
     const rows = verifs || [];
-    const refs = [...new Set(rows.map(r => r.booking_ref).filter(Boolean))];
 
-    // Join booking + packages (best effort; logs should still render if join fails)
-    let bookingMap = new Map();
-    if (refs.length) {
-      const { data: bookings, error: bErr } = await supabase
-        .from("bookings")
-        .select("booking_ref, customer_name, package:packages(id, name)")
-        .in("booking_ref", refs);
-
-      if (!bErr && bookings) {
-        bookingMap = new Map(bookings.map(b => [b.booking_ref, b]));
-      }
-    }
-
-    lastRows = rows.map(r => {
-      const b = bookingMap.get(r.booking_ref);
-      return {
-        verified_at: r.verified_at,
-        booking_ref: r.booking_ref,
-        customer_name: b?.customer_name || "—",
-        package_name: b?.package?.name || "—",
-        result: r.result || r.status || "checked",
-        verified_by: r.verified_by || "",
-        notes: r.notes || ""
-      };
-    });
+    // Rows already include booking + package via FK join (booking_uuid → bookings.id)
+    lastRows = rows.map(r => ({
+      verified_at: r.verified_at,
+      booking_ref: r.booking?.booking_ref || r.booking_code || "—",
+      customer_name: r.booking?.customer_name || "—",
+      package_name: r.booking?.package?.name || "—",
+      result: r.outcome || "checked",
+      verified_by: r.verified_by || "",
+      notes: r.message || ""
+    }));
 
     if (!tbody) return;
 
@@ -475,7 +469,7 @@
   if (signOutBtn) {
     signOutBtn.addEventListener("click", async () => {
       await supabase.auth.signOut();
-      location.href = "staff-login.html";
+      location.href = "index.html";
     });
   }
 

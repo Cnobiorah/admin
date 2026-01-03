@@ -6,8 +6,7 @@
   <title>Staff Login — ZoD Hub</title>
   
   <script>
-    // Route root to staff login
-    window.location.replace("staff-login.html");
+  
   </script>
 <style>
     :root{
@@ -111,9 +110,6 @@
     // PROOF JS is running:
     console.log("staff-login.js loaded ✅");
 
-    // If already logged in, go straight to verification
-    const { data: sessionData } = await supabase.auth.getSession();
-    if (sessionData?.session) window.location.href = VERIFY_PAGE;
 
     async function doLogin(){
       clearError();

@@ -254,7 +254,7 @@
           <p>Verify a booking reference and confirm entry.</p>
         </div>
         <div class="actions">
-          <a id="signOutLink" class="btn ghost" href="./staff-login.html">Sign out</a>
+          <a id="signOutLink" class="btn ghost" href="./index.html">Sign out</a>
           <div class="avatar" title="Staff">SA</div>
         </div>
       </div>
@@ -363,7 +363,7 @@
 
     // Guard: must be logged in
     const { data: sessionData } = await supabase.auth.getSession();
-    if (!sessionData?.session) window.location.href = "./staff-login.html";
+    if (!sessionData?.session) window.location.href = "./index.html";
 
     // Guard: must be staff
     const { data: isStaff, error: staffErr } = await supabase.rpc("is_staff");
@@ -431,7 +431,7 @@ if (!verifyBtn.disabled) {
     signOutLink.addEventListener("click", async (e) => {
       e.preventDefault();
       await supabase.auth.signOut();
-      window.location.href = "./staff-login.html";
+      window.location.href = "./index.html";
     });
 
     verifyBtn.addEventListener("click", async () => {

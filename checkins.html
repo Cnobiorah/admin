@@ -333,11 +333,25 @@
     const nextIso = new Date(Date.parse(startIso) + 24*60*60*1000).toISOString();
 
     const { data: verifs, error: vErr } = await supabase
-      .from("booking_verifications")
-      .select("booking_id, verified_at, verified_by, result, status, booking:bookings(booking_ref, customer_name, amount_ngn, package:packages(name))")
-      .gte("verified_at", startIso)
-      .lt("verified_at", nextIso)
-      .order("verified_at", { ascending: false });
+  .from("booking_verifications")
+  .select(`
+    booking_uuid,
+    booking_code,
+    verified_at,
+    verified_by,
+    outcome,
+    message,
+    booking:bookings (
+      booking_ref,
+      customer_name,
+      amount_ngn,
+      package:packages ( name )
+    )
+  `)
+  .gte("verified_at", startIso)
+  .lt("verified_at", nextIso)
+  .order("verified_at", { ascending: false });
+
 
     if (vErr) throw vErr;
 
@@ -373,7 +387,7 @@
       const pkg = b?.package?.name || "—";
       const amount = fmtMoney(b?.amount_ngn);
       const staff = v.verified_by ? String(v.verified_by).slice(0,6) + "…" : "—";
-      const res = v.result || v.status || "verified";
+     const res = v.outcome || "verified";
       return `
         <tr>
           <td>${fmtTime(v.verified_at)}</td>
@@ -393,7 +407,7 @@
   if (signOutBtn) {
     signOutBtn.addEventListener("click", async () => {
       await supabase.auth.signOut();
-      location.href = "staff-login.html";
+      location.href = "index.html";
     });
   }
 
