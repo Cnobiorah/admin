@@ -1,0 +1,260 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Verify Booking Reference — ZoD Hub</title>
+
+  <style>
+    :root{
+      --bg:#fbfbf8; --card:#fff; --text:#0f172a; --muted:#475569; --line:#e5e7eb;
+      --accent:#0b3b89; --accent2:#0a2f6d; --danger:#b91c1c; --success:#166534;
+      --radius:18px; --shadow:0 18px 45px rgba(2,6,23,.08); --focus:0 0 0 4px rgba(11,59,137,.18);
+    }
+    *{box-sizing:border-box}
+    body{
+      margin:0; min-height:100vh; display:grid; place-items:center; padding:24px;
+      font-family:system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial;
+      background:radial-gradient(1000px 600px at 20% 10%, rgba(11,59,137,.10), transparent 55%), var(--bg);
+      color:var(--text);
+    }
+    .wrap{width:min(560px,100%)}
+    .card{background:var(--card); border:1px solid var(--line); border-radius:var(--radius); box-shadow:var(--shadow); padding:26px}
+    .brand{display:flex; gap:12px; align-items:center; padding-bottom:12px; border-bottom:1px solid var(--line); margin-bottom:18px}
+    .logo{width:42px; height:42px; border-radius:12px; display:grid; place-items:center; background:rgba(11,59,137,.1);
+      border:1px solid rgba(11,59,137,.18); font-weight:800; color:var(--accent)}
+    .brand h1{margin:0; font-size:16px}
+    .brand p{margin:2px 0 0; font-size:13px; color:var(--muted)}
+    h2{margin:0; font-size:22px}
+    .subtitle{margin:8px 0 18px; font-size:14px; color:var(--muted); line-height:1.5}
+    label{font-size:13px; color:var(--muted)}
+    input{width:100%; padding:14px; margin-top:8px; border-radius:14px; border:1px solid var(--line); font-size:16px; outline:none}
+    input:focus{border-color:rgba(11,59,137,.55); box-shadow:var(--focus)}
+    .hint{margin-top:6px; font-size:12.5px; color:var(--muted)}
+    .actions{display:flex; gap:12px; margin-top:18px; flex-wrap:wrap}
+    button{padding:13px 18px; border-radius:14px; border:none; font-weight:600; cursor:pointer; min-width:150px}
+    .primary{background:var(--accent); color:#fff}
+    .primary:hover{background:var(--accent2)}
+    .secondary{background:#fff; border:1px solid rgba(11,59,137,.35); color:var(--accent)}
+    .status{display:none; margin-top:16px; padding:12px; border-radius:14px; border:1px solid var(--line); font-size:13px; line-height:1.45}
+    .status.show{display:block}
+    .status.ok{background:rgba(22,101,52,.06); border-color:rgba(22,101,52,.28); color:var(--success)}
+    .status.bad{background:rgba(185,28,28,.06); border-color:rgba(185,28,28,.28); color:var(--danger)}
+    .details{margin-top:10px; color:var(--muted)}
+    .row{display:flex; justify-content:space-between; gap:10px; padding:6px 0; border-bottom:1px dashed rgba(15,23,42,.10)}
+    .row:last-child{border-bottom:none}
+    .footer{margin-top:18px; font-size:12px; color:var(--muted); display:flex; justify-content:space-between; gap:10px; flex-wrap:wrap}
+    .footer a{color:var(--accent); text-decoration:none}
+  
+/* NAV FIX: ensure sidebar items are clickable above decorative layers */
+.sidebar, .sidebar * { pointer-events: auto; }
+.sidebar { position: relative; z-index: 5; }
+
+</style>
+</head>
+
+<body>
+  <main class="wrap">
+    <section class="card">
+      <div class="brand">
+        <div class="logo">Z</div>
+        <div>
+          <h1>ZoD Hub</h1>
+          <p>Booking Reference Verification</p>
+        </div>
+      </div>
+
+      <h2>Verify a booking</h2>
+      <p class="subtitle">Enter the booking reference to check validity.</p>
+
+      <label for="code">Booking reference</label>
+      <input id="code" type="text" placeholder="e.g. ZDH-5A7309E8" autocomplete="off" />
+      <div class="hint">References are provided on the confirmation page or email receipt.</div>
+
+      <div class="actions">
+        <button id="verifyBtn" class="primary" type="button">Verify reference</button>
+        <button id="clearBtn" class="secondary" type="button">Clear</button>
+      </div>
+
+      <div id="status" class="status" role="status" aria-live="polite"></div>
+
+      <div class="footer">
+        <span>Need help? <a href="mailto:hello@zodhub.com">hello@zodhub.com</a></span>
+        <a id="signOutLink" href="./staff-login.html">Sign out</a>
+      </div>
+    </section>
+  </main>
+
+  <script type="module">
+  async function getPackageName(package_id) {
+  if (!package_id) return "-";
+  const { data, error } = await supabase
+    .from("packages")
+    .select("name")
+    .eq("id", package_id)
+    .maybeSingle();
+  if (error || !data) return "-";
+  return data.name || "-";
+}
+    import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+
+    // ✅ REQUIRED: paste from Supabase → Project Settings → API
+    const SUPABASE_URL = "https://dzazdrpgedrrcnuzgjjc.supabase.co";
+    const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImR6YXpkcnBnZWRycmNudXpnampjIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjcxMjUxOTQsImV4cCI6MjA4MjcwMTE5NH0.8ZRnOiGtyfi5ibmTbKLROnQ4PqBIDvDfeH-mWGUQy_M";
+
+    const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+    
+    window.supabase = supabase;
+const statusEl = document.getElementById("status");
+    const codeEl = document.getElementById("code");
+    const verifyBtn = document.getElementById("verifyBtn");
+    const clearBtn = document.getElementById("clearBtn");
+    const signOutLink = document.getElementById("signOutLink");
+
+    const show = (ok, html) => {
+      statusEl.className = "status show " + (ok ? "ok" : "bad");
+      statusEl.innerHTML = html;
+    };
+    const hide = () => { statusEl.className = "status"; statusEl.innerHTML = ""; };
+    const row = (k,v) => `<div class="row"><strong>${k}</strong><span>${v ?? "-"}</span></div>`;
+
+    const todayISO = () => {
+      const d = new Date();
+      return `${d.getUTCFullYear()}-${String(d.getUTCMonth()+1).padStart(2,"0")}-${String(d.getUTCDate()).padStart(2,"0")}`;
+    };
+
+    // Guard: must be logged in
+    const { data: sessionData } = await supabase.auth.getSession();
+    if (!sessionData?.session) window.location.href = "./staff-login.html";
+
+    // Guard: must be staff
+    const { data: isStaff, error: staffErr } = await supabase.rpc("is_staff");
+    if (staffErr || !isStaff) {
+      show(false, "❌ Access denied. This page is for staff only.");
+      verifyBtn.disabled = true;
+    }
+
+    signOutLink.addEventListener("click", async (e) => {
+      e.preventDefault();
+      await supabase.auth.signOut();
+      window.location.href = "./staff-login.html";
+    });
+
+    verifyBtn.addEventListener("click", async () => {
+      hide();
+      const ref = (codeEl.value || "").trim();
+      if (!ref) return show(false, "❌ Please enter a booking reference.");
+
+      verifyBtn.disabled = true;
+      verifyBtn.textContent = "Verifying...";
+
+      try {
+        // 1) Fetch booking by booking_ref (THIS is your official code)
+        const { data: b, error: fetchErr } = await supabase
+          .from("bookings")
+          .select(`
+  booking_ref,
+  customer_name,
+  start_date,
+  end_date,
+  amount_ngn,
+  status,
+  paid_at,
+  verified_at,
+  used_at,
+  package:packages ( id, name )
+`)
+          .eq("booking_ref", ref)
+          .maybeSingle();
+
+        if (fetchErr) return show(false, `❌ Database error: ${fetchErr.message}`);
+        if (!b) return show(false, "❌ Invalid booking reference.");
+		const packageName = await getPackageName(b.package_id);
+
+        // 2) Payment check (prefer payment_status; fallback to paid_at)
+        const pay = String(b.payment_status || "").toLowerCase();
+        const paidOk = ["paid","confirmed","success"].includes(pay) || !!b.paid_at;
+        if (!paidOk) return show(false, "❌ Booking is not paid/confirmed.");
+
+        // 3) Expiry check (if end_date exists)
+        const today = todayISO();
+        if (b.end_date && String(b.end_date) < today) return show(false, "❌ Booking has expired.");
+
+        // 4) Already used check
+        if (b.used_at) return show(false, "❌ Booking reference already used.");
+
+        // 5) Consume daily, otherwise just verify
+        const pkgName = String(b.package?.name || "").toLowerCase();
+		const consume = pkgName.includes("daily");
+
+
+        const updatePayload = {
+          verified_at: new Date().toISOString(),
+          verified_by: sessionData.session.user.id,
+          ...(consume ? { used_at: new Date().toISOString() } : {})
+        };
+
+        const { data: updated, error: upErr } = await supabase
+          .from("bookings")
+          .update(updatePayload)
+          .eq("booking_ref", ref)
+          .select(`
+  booking_ref,
+  customer_name,
+  start_date,
+  end_date,
+  package_type,
+  package_id,
+  amount_ngn,
+  payment_status,
+  status,
+  paid_at,
+  verified_at,
+  used_at
+`)
+          .single();
+
+        if (upErr) return show(false, `❌ Failed to update booking: ${upErr.message}`);
+
+        // Audit log (best-effort). We store booking_ref inside booking_code column as the "code".
+        await supabase.from("booking_verifications").insert({
+  booking_code: ref,
+  action: "verify",
+  outcome: "verified",
+  message: consume ? "Verified & consumed (daily)" : "Verified",
+  verified_by: sessionData.session.user.id
+});
+
+
+   const details = `
+  <div class="details">
+    ${row("Booking ref", updated.booking_ref)}
+    ${row("Customer", updated.customer_name)}
+    ${row("Package", packageName)}
+    ${row("Amount", updated.amount_ngn ? `₦${updated.amount_ngn}` : "-")}
+    ${row("Start", updated.start_date)}
+    ${row("End", updated.end_date)}
+    ${row("Payment", updated.status || (updated.paid_at ? "paid" : "pending"))}
+    ${row("Verified at", updated.verified_at)}
+    ${row("Consumed", consume ? "Yes (daily)" : "No")}
+  </div>
+`;
+
+
+        show(true, `✅ Verified successfully.${details}`);
+
+      } finally {
+        verifyBtn.disabled = false;
+        verifyBtn.textContent = "Verify reference";
+      }
+    });
+
+    clearBtn.addEventListener("click", () => {
+      codeEl.value = "";
+      hide();
+      codeEl.focus();
+    });
+  </script>
+</body>
+</html>
